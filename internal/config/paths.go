@@ -20,7 +20,7 @@ func DefaultPaths() (Paths, error) {
 		return Paths{}, err
 	}
 
-	root := filepath.Join(home, ".config", ".packr")
+	root := filepath.Join(home, ".config", "packr")
 	// Ensure root is absolute (should already be, but be explicit)
 	absRoot, err := filepath.Abs(root)
 	if err != nil {

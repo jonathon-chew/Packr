@@ -50,7 +50,7 @@ func Install(pkg registry.Package, release registry.Release, target registry.Tar
 		return err
 	}
 
-	// 4. copy into ~/.packr/bin/<bin>
+	// 4. copy into ~/.config/packr/bin/<bin>
 	destBinPath := filepath.Join(paths.BinDir, target.Bin)
 	if err := copyFile(srcBinPath, destBinPath, 0o755); err != nil {
 		return err
