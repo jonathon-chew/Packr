@@ -16,7 +16,7 @@ func LoadLocalPackage(name string) (Package, error) {
 	}
 
 	exeDir := filepath.Dir(exe)
-	registryDir := filepath.Join(exeDir, "..", "..", "registry") // adjust if layout differs
+	registryDir := filepath.Join(exeDir, "internal", "registry") // adjust if layout differs
 
 	path := filepath.Join(registryDir, name+".yaml")
 	data, err := os.ReadFile(path)
