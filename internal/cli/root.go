@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"os"
 )
@@ -54,16 +53,4 @@ Examples:
   packr install ripgrep
   packr list
 `)
-}
-
-func runList(args []string) int {
-	fs := flag.NewFlagSet("list", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-
-	fmt.Println("TODO: list installed packages")
-	return 0
 }
