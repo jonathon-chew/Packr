@@ -51,6 +51,7 @@ Commands:
 
 Examples:
   packr install ripgrep
+  packr install sharkdp/bat
   packr list
 `)
 }

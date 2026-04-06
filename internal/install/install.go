@@ -1,10 +1,12 @@
 package install
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jonathon-chew/Packr/internal/archive"
 	"github.com/jonathon-chew/Packr/internal/config"
@@ -28,6 +30,16 @@ func Install(pkg registry.Package, release registry.Release, target registry.Tar
 		return fmt.Errorf("checksum: %w", err)
 	}
 
+	archiveType := target.ArchiveType
+	if archiveType == "" {
+		archiveType = archive.GuessArchiveType(cachePath)
+	}
+
+	destName := filepath.Base(target.Bin)
+	if destName == "." || destName == "" || destName == string(filepath.Separator) {
+		destName = filepath.Base(cachePath)
+	}
+
 	// 2. extract to temp dir
 	tmpDir, err := os.MkdirTemp("", "packr-extract-*")
 	if err != nil {
@@ -35,23 +47,29 @@ func Install(pkg registry.Package, release registry.Release, target registry.Tar
 	}
 	defer os.RemoveAll(tmpDir)
 
-	switch archive.GuessArchiveType(cachePath) {
+	var srcBinPath string
+	switch archiveType {
 	case "tar.gz":
 		if err := archive.ExtractTarGz(cachePath, tmpDir); err != nil {
 			return fmt.Errorf("extract: %w", err)
 		}
+		srcBinPath, err = findBinary(tmpDir, target.Bin)
+	case "zip":
+		if err := archive.ExtractZip(cachePath, tmpDir); err != nil {
+			return fmt.Errorf("extract: %w", err)
+		}
+		srcBinPath, err = findBinary(tmpDir, target.Bin)
+	case "binary":
+		srcBinPath = cachePath
 	default:
 		return fmt.Errorf("unsupported archive type for %s", cachePath)
 	}
-
-	// 3. locate the binary file
-	srcBinPath, err := findBinary(tmpDir, target.Bin)
 	if err != nil {
 		return err
 	}
 
 	// 4. copy into ~/.config/packr/bin/<bin>
-	destBinPath := filepath.Join(paths.BinDir, target.Bin)
+	destBinPath := filepath.Join(paths.BinDir, destName)
 	if err := copyFile(srcBinPath, destBinPath, 0o755); err != nil {
 		return err
 	}
@@ -65,24 +83,55 @@ func Install(pkg registry.Package, release registry.Release, target registry.Tar
 }
 
 func findBinary(root, binName string) (string, error) {
-	var found string
+	if binName != "" {
+		var found string
+		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.Type().IsRegular() && filepath.Base(path) == filepath.Base(binName) {
+				found = path
+				return errors.New("found")
+			}
+			return nil
+		})
+		if found != "" {
+			return found, nil
+		}
+		if err != nil && err.Error() != "found" {
+			return "", err
+		}
+	}
+
+	var candidates []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.Type().IsRegular() && filepath.Base(path) == binName {
-			found = path
-			return fmt.Errorf("found") // early stop
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		if isExecutableCandidate(path, d) {
+			candidates = append(candidates, path)
 		}
 		return nil
 	})
-	if found != "" {
-		return found, nil
+	if err != nil {
+		return "", err
 	}
-	if err != nil && err.Error() == "found" {
-		// handled above
+	if len(candidates) == 1 {
+		return candidates[0], nil
 	}
-	return "", fmt.Errorf("binary %q not found in archive", binName)
+	if len(candidates) > 1 {
+		best := rankCandidates(candidates, binName)
+		if best != "" {
+			return best, nil
+		}
+	}
+	if binName != "" {
+		return "", fmt.Errorf("binary %q not found in archive", filepath.Base(binName))
+	}
+	return "", fmt.Errorf("could not determine which binary to install from archive")
 }
 
 func copyFile(src, dest string, mode os.FileMode) error {
@@ -106,4 +155,51 @@ func copyFile(src, dest string, mode os.FileMode) error {
 		return err
 	}
 	return nil
+}
+
+func isExecutableCandidate(path string, d os.DirEntry) bool {
+	info, err := d.Info()
+	if err != nil {
+		return false
+	}
+	if info.Mode()&0o111 == 0 {
+		return false
+	}
+
+	base := strings.ToLower(filepath.Base(path))
+	for _, blocked := range []string{"readme", "license", "install", "uninstall", ".txt", ".md"} {
+		if strings.Contains(base, blocked) {
+			return false
+		}
+	}
+	return true
+}
+
+func rankCandidates(candidates []string, preferred string) string {
+	preferred = strings.ToLower(filepath.Base(preferred))
+	if preferred != "" {
+		for _, candidate := range candidates {
+			if strings.EqualFold(filepath.Base(candidate), preferred) {
+				return candidate
+			}
+		}
+	}
+
+	var best string
+	bestScore := -1
+	for _, candidate := range candidates {
+		score := 0
+		base := strings.ToLower(filepath.Base(candidate))
+		if !strings.Contains(base, ".") {
+			score += 2
+		}
+		if strings.Contains(strings.ToLower(filepath.ToSlash(candidate)), "/bin/") {
+			score++
+		}
+		if score > bestScore {
+			best = candidate
+			bestScore = score
+		}
+	}
+	return best
 }

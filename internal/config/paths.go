@@ -37,7 +37,7 @@ func DefaultPaths() (Paths, error) {
 }
 
 func EnsureDirs(p Paths) error {
-	for _, dir := range []string{p.Root, p.BinDir, p.CacheDir, p.StateDir} {
+	for _, dir := range []string{p.Root, p.BinDir, p.CacheDir, p.StateDir, p.RegistryDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}

@@ -40,15 +40,9 @@ func runInstall(args []string) int {
 		return 1
 	}
 
-	pkg, err := registry.LoadLocalPackage(name)
+	pkg, release, err := registry.LoadPackage(paths.RegistryDir, name, version)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error loading package %q: %v\n", name, err)
-		return 1
-	}
-
-	release, err := registry.ResolveRelease(pkg, version)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error resolving version for %q: %v\n", name, err)
 		return 1
 	}
 

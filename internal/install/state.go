@@ -52,12 +52,20 @@ func AppendState(p config.Paths, name, version, path string) error {
 		return err
 	}
 
-	// naive: no dedupe for v0.1
-	s.Packages = append(s.Packages, InstalledPackage{
+	entry := InstalledPackage{
 		Name:    name,
 		Version: version,
 		Path:    path,
-	})
+	}
+
+	for i := range s.Packages {
+		if s.Packages[i].Name == name {
+			s.Packages[i] = entry
+			return saveState(p, s)
+		}
+	}
+
+	s.Packages = append(s.Packages, entry)
 
 	return saveState(p, s)
 }
