@@ -1,5 +1,11 @@
 # CHANGELOG
 
+	## v0.1.1, localorigin/main 
+
+		### NEW
+		1. adding a LICENSE
+		1. adding a new change log, tracking git changes in one place / file
+
 	## v0.1.0 
 
 		### UPDATES
